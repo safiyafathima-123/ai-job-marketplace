@@ -1,30 +1,13 @@
-/**
- * hederaService.js — Hedera Simulation Layer
- *
- * Simulates Hedera Hashgraph services:
- *   - HTS  (Hedera Token Service)   → ComputeToken balances & transfers
- *   - HSC  (Hedera Smart Contract)  → Escrow + milestone release logic
- *   - HCS  (Hedera Consensus Service) → Immutable on-chain log topic
- *
- * Architecture note:
- *   Every function here has the SAME signature it would have
- *   against the real Hedera JS SDK. To go live, replace the
- *   mock bodies with real SDK calls — nothing else changes.
- */
+import { v4 as uuidv4 } from 'uuid';
 
-const { v4: uuidv4 } = require('uuid');
+export const TOKEN_SYMBOL   = 'COMPUTE';
+export const TOKEN_NAME     = 'ComputeToken (HTS)';
+export const TOKEN_ID       = '0.0.4821903';          // mock HTS token ID
+export const NETWORK        = 'testnet';
+export const HCS_TOPIC_ID   = '0.0.5193847';          // mock HCS topic for job logs
+export const EXCHANGE_RATE  = 1000;                    // 1 USD = 1000 COMPUTE tokens
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const TOKEN_SYMBOL   = 'COMPUTE';
-const TOKEN_NAME     = 'ComputeToken (HTS)';
-const TOKEN_ID       = '0.0.4821903';          // mock HTS token ID
-const NETWORK        = 'testnet';
-const HCS_TOPIC_ID   = '0.0.5193847';          // mock HCS topic for job logs
-const EXCHANGE_RATE  = 1000;                    // 1 USD = 1000 COMPUTE tokens
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function mockTxId() {
-  // Hedera TX IDs look like: 0.0.ACCOUNTID@SECONDS.NANOS
   const account = Math.floor(Math.random() * 900000 + 100000);
   const secs    = Math.floor(Date.now() / 1000);
   const nanos   = Math.floor(Math.random() * 999999999);
@@ -35,26 +18,11 @@ function mockSeqNum() {
   return Math.floor(Math.random() * 900000 + 100000);
 }
 
-/**
- * Convert USD → COMPUTE tokens (integer, no decimals)
- */
-function usdToTokens(usd) {
+export function usdToTokens(usd) {
   return Math.round(parseFloat(usd) * EXCHANGE_RATE);
 }
 
-// ── Smart Contract: Escrow ────────────────────────────────────────────────────
-/**
- * Deploy a milestone-based escrow contract for a job.
- *
- * Milestones release tokens progressively:
- *   25% on provider selection
- *   25% at 50% progress
- *   25% at 80% progress
- *   25% on completion
- *
- * Returns the contract state object stored on the job.
- */
-function createEscrowContract(jobId, budgetUsd) {
+export function createEscrowContract(jobId, budgetUsd) {
   const totalTokens = usdToTokens(budgetUsd);
   const contractId  = `0.0.${Math.floor(Math.random() * 9000000 + 1000000)}`;
   const deployTx    = mockTxId();
@@ -78,7 +46,7 @@ function createEscrowContract(jobId, budgetUsd) {
     escrowedTokens: totalTokens,
     releasedTokens: 0,
     refundedTokens: 0,
-    contractStatus: 'ACTIVE',   // ACTIVE | COMPLETED | TERMINATED
+    contractStatus: 'ACTIVE',
     milestones,
     hcsTopicId:     HCS_TOPIC_ID,
     hcsMessages:    [],
@@ -86,11 +54,7 @@ function createEscrowContract(jobId, budgetUsd) {
   };
 }
 
-/**
- * Release tokens for a specific milestone.
- * Returns updated contract state.
- */
-function releaseMilestone(contract, milestoneId) {
+export function releaseMilestone(contract, milestoneId) {
   const ms = contract.milestones.find(m => m.id === milestoneId);
   if (!ms || ms.released) return contract;
 
@@ -105,10 +69,7 @@ function releaseMilestone(contract, milestoneId) {
   return { ...contract, milestones: [...contract.milestones] };
 }
 
-/**
- * Terminate contract early and refund remaining escrowed tokens to buyer.
- */
-function terminateContract(contract, reason) {
+export function terminateContract(contract, reason) {
   const refundTxId      = mockTxId();
   contract.contractStatus = 'TERMINATED';
   contract.refundedTokens = contract.escrowedTokens;
@@ -119,21 +80,13 @@ function terminateContract(contract, reason) {
   return { ...contract };
 }
 
-/**
- * Finalise a successfully completed contract.
- */
-function completeContract(contract) {
+export function completeContract(contract) {
   contract.contractStatus = 'COMPLETED';
   contract.completedAt    = new Date().toISOString();
   return { ...contract };
 }
 
-// ── HCS: Consensus Log ────────────────────────────────────────────────────────
-/**
- * Append a message to the HCS topic log.
- * In production: TopicMessageSubmitTransaction to HCS_TOPIC_ID.
- */
-function appendHcsMessage(contract, message) {
+export function appendHcsMessage(contract, message) {
   const entry = {
     seqNum:    mockSeqNum(),
     topicId:   contract.hcsTopicId,
@@ -145,17 +98,3 @@ function appendHcsMessage(contract, message) {
   contract.hcsMessages = [...(contract.hcsMessages || []), entry];
   return { ...contract };
 }
-
-module.exports = {
-  createEscrowContract,
-  releaseMilestone,
-  terminateContract,
-  completeContract,
-  appendHcsMessage,
-  usdToTokens,
-  TOKEN_SYMBOL,
-  TOKEN_NAME,
-  TOKEN_ID,
-  HCS_TOPIC_ID,
-  EXCHANGE_RATE,
-};

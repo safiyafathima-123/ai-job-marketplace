@@ -1,15 +1,39 @@
-/**
- * routes/providers.js
- *
- * GET /api/providers       — List all providers
- * GET /api/providers/:id   — Get single provider details
- */
+import express from 'express';
+import { getProviders, getProvider, registerProvider } from '../services/providerService.js';
+import pricingAgent from '../services/pricingAgent.js';
 
-const express = require('express');
 const router = express.Router();
-const { getProviders, getProvider } = require('../services/providerService');
 
-router.get('/', (_req, res) => {
+router.get('/market-summary', (req, res) => {
+  try {
+    const summary = pricingAgent.getMarketSummary();
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/pricing-logs', (req, res) => {
+  try {
+    const logs = pricingAgent.getPricingLogs();
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/register', (req, res) => {
+  try {
+    console.log('[DEBUG] Registering provider:', req.body.name);
+    const provider = registerProvider(req.body);
+    res.status(201).json(provider);
+  } catch (err) {
+    console.error('[DEBUG] Registration error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.get('/', (req, res) => {
   const providers = getProviders();
   res.json({ providers, total: providers.length });
 });
@@ -22,4 +46,4 @@ router.get('/:id', (req, res) => {
   res.json(provider);
 });
 
-module.exports = router;
+export default router;

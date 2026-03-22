@@ -1,15 +1,15 @@
-require('dotenv').config();   // ← load .env FIRST, before anything else
+import 'dotenv/config'; // load .env FIRST
+import express from 'express';
+import cors from 'cors';
+import jobRoutes from './routes/jobs.js';
+import providerRoutes from './routes/providers.js';
+import walletRoutes from './routes/wallet.js';
+import { checkConnection } from './services/realHederaService.js';
 
-const express = require('express');
-const cors    = require('cors');
-const jobRoutes      = require('./routes/jobs');
-const providerRoutes = require('./routes/providers');
-const { checkConnection } = require('./services/realHederaService');
-
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ── Middleware ────────────────────────────────────────────────────────────────
+// -- Middleware --
 app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
 app.use((req, _res, next) => {
@@ -17,9 +17,10 @@ app.use((req, _res, next) => {
   next();
 });
 
-// ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/jobs',      jobRoutes);
+// -- Routes --
+app.use('/api/jobs', jobRoutes);
 app.use('/api/providers', providerRoutes);
+app.use('/api/wallet', walletRoutes);
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
 // 404
@@ -31,7 +32,7 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error', message: err.message });
 });
 
-// ── Start ─────────────────────────────────────────────────────────────────────
+// -- Start --
 app.listen(PORT, async () => {
   console.log(`\n🚀 AI Job Marketplace API running on http://localhost:${PORT}`);
   console.log(`──────────────────────────────────────────`);
@@ -42,4 +43,4 @@ app.listen(PORT, async () => {
   console.log(`──────────────────────────────────────────\n`);
 });
 
-module.exports = app;
+export default app;

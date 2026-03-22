@@ -3,10 +3,128 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Job Marketplace</title>
+    <title>AI Job Marketplace | Hedera Apex 2026</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+  /* Hedera Apex + Killer Combo */
+  --bg: #050507;
+  --bg-card: #0d0d12;
+  --accent: #8259EF; 
+  --accent-mid: #5a3ebd;
+  --accent-dim: rgba(130, 89, 239, 0.15);
+  --green: #00f5a0;
+  --green-dim: rgba(0, 245, 160, 0.1);
+  --red: #ff4d4d;
+  --red-dim: rgba(255, 77, 77, 0.1);
+  --amber: #ffb347;
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+  --border: #1e1e26;
+  --border-bright: #3f3f46;
+  --radius-lg: 16px;
+  --radius: 8px;
+  --font-main: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  background-image: radial-gradient(circle at 50% -20%, #1a152e 0%, transparent 50%);
+  min-height: 100vh;
+}
+
+.mono { font-family: var(--font-mono); }
+
+/* Killer Card Transitions */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  transform: translateY(-4px);
+}
+
+/* Typography for Home Page */
+.hero-text {
+  font-size: 3.5rem;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, var(--accent), #a855f7, var(--green));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Dashboard Specific Grids */
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+/* Custom Buttons - Premium Rich Gradient Integration */
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent) 0%, #c084fc 40%, #00f5a0 100%);
+        background-size: 200% 200%;
+        color: #ffffff !important;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-family: var(--font-main);
+        font-weight: 800;
+        text-decoration: none;
+        display: inline-block;
+        border: 1px solid rgba(255,255,255,0.25);
+        box-shadow: 0 4px 14px 0 rgba(130, 89, 239, 0.4), inset 0 1px 0 rgba(255,255,255,0.3);
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+
+      .btn-primary:hover {
+        background-position: 100% 100%;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0, 245, 160, 0.4), inset 0 1px 0 rgba(255,255,255,0.6);
+        border-color: rgba(255,255,255,0.5);
+      }
+      .btn-primary:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 8px rgba(130, 89, 239, 0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+      }
+
+      /* Pulse Animation for Live Status */
+      @keyframes pulse {
+        0%   { opacity: 1; }
+        50%  { opacity: 0.5; }
+        100% { opacity: 1; }
+      }
+
+      /* Scrollbar Styling */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 10px; }
+    </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script> 
+  </body>
   </body>
 </html>

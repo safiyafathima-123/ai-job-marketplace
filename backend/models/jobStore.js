@@ -1,74 +1,55 @@
 /**
- * jobStore.js — In-memory data store
- *
- * Abstraction layer over raw storage.
- * Swap this file for a real DB — all routes stay the same.
+ * models/jobStore.js
+ * In-memory job store (replace with real DB later).
  */
-
-const { v4: uuidv4 } = require('uuid');
 
 const jobs = new Map();
 
-const JOB_STATUS = {
-  PENDING:    'pending',
-  MATCHING:   'matching',
-  RUNNING:    'running',
-  COMPLETED:  'completed',
-  FAILED:     'failed',
+export const JOB_STATUS = {
+  PENDING: 'pending',
+  MATCHING: 'matching',
+  RUNNING: 'running',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
 };
 
-function createJob({ title, description, jobType, budget, requiredAccuracy }) {
-  const id = uuidv4();
+export function createJob(data) {
+  const id = `job-${Date.now()}`;
   const job = {
     id,
-    title,
-    description,
-    jobType,
-    budget: parseFloat(budget),
-    requiredAccuracy: parseFloat(requiredAccuracy) || 90,
+    ...data,
     status: JOB_STATUS.PENDING,
     progress: 0,
-    selectedProvider:     null,
-    selectedProviderId:   null,
-    providerTier:         null,
-    providerReputation:   null,
-    providerResourceType: null,
-    providerSpecs:        null,
-    providerScore:        null,
-    estimatedCost:        null,
-    createdAt:   new Date().toISOString(),
-    updatedAt:   new Date().toISOString(),
-    completedAt: null,
-    output:      null,
-    // ── Hedera fields ──────────────────────────────────────────────────────
-    hedera:      null,   // full contract + HCS state (set after escrow deploy)
-    logs:        [`Job created at ${new Date().toISOString()}`],
+    logs: [],
+    createdAt: new Date().toISOString(),
   };
-
   jobs.set(id, job);
   return job;
 }
 
-function getJob(id)    { return jobs.get(id) || null; }
-function getAllJobs()   {
-  return [...jobs.values()].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+export function getJob(id) {
+  return jobs.get(id);
 }
 
-function updateJob(id, updates) {
+export function getAllJobs() {
+  return Array.from(jobs.values());
+}
+
+export function updateJob(id, data) {
   const job = jobs.get(id);
-  if (!job) return null;
-  const updated = { ...job, ...updates, updatedAt: new Date().toISOString() };
-  jobs.set(id, updated);
-  return updated;
+  if (job) {
+    Object.assign(job, data, { updatedAt: new Date().toISOString() });
+    return job;
+  }
+  return null;
 }
 
-function appendLog(id, message) {
+export function appendLog(id, message) {
   const job = jobs.get(id);
-  if (!job) return null;
-  job.logs = [...(job.logs || []), `[${new Date().toISOString()}] ${message}`];
-  job.updatedAt = new Date().toISOString();
-  jobs.set(id, job);
-  return job;
+  if (job) {
+    job.logs.push({
+      timestamp: new Date().toISOString(),
+      message,
+    });
+  }
 }
-
-module.exports = { createJob, getJob, getAllJobs, updateJob, appendLog, JOB_STATUS };

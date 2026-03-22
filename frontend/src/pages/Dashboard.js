@@ -5,8 +5,33 @@ import { fetchJobs, fetchJob, simulateJobFailure } from '../services/api';
 // ── Tiny helpers ──────────────────────────────────────────────────────────────
 function SectionLabel({ children }) {
   return (
-    <div style={{ fontSize:'0.68rem', fontWeight:800, color:'var(--text-muted)', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:10 }}>
+    <div style={{ fontSize:'0.72rem', fontWeight:900, color:'var(--text-muted)', letterSpacing:'0.15em', textTransform:'uppercase', marginBottom:12, opacity:0.8 }}>
       {children}
+    </div>
+  );
+}
+
+function MiniClock() {
+  const [time, setTime] = useState(new Date().toLocaleTimeString());
+  
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setTime(new Date().toLocaleTimeString());
+    }, 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const seconds = new Date().getSeconds();
+  const secondDeg = (seconds / 60) * 360;
+  
+  return (
+    <div style={{ display:'inline-flex', alignItems:'center', gap:10, background:'var(--accent)', padding:'7px 18px', borderRadius:'30px', border:'1px solid var(--accent)', boxShadow:'0 8px 24px rgba(0,229,255,0.4)', backdropFilter:'blur(12px)' }}>
+      <div style={{ width:18, height:18, borderRadius:'50%', border:'2px solid #000', position:'relative' }}>
+        <div style={{ position:'absolute', top:'50%', left:'50%', width:'2px', height:7, background:'#000', transformOrigin:'bottom', transform:`translate(-50%, -100%) rotate(${secondDeg}deg)`, transition:'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }} />
+        <div style={{ position:'absolute', top:'50%', left:'50%', width:'2px', height:5, background:'rgba(0,0,0,0.6)', transformOrigin:'bottom', transform:`translate(-50%, -100%) rotate(120deg)` }} />
+        <div style={{ position:'absolute', top:'50%', left:'50%', width:'4px', height:4, background:'#000', borderRadius:'50%', transform:'translate(-50%, -50%)' }} />
+      </div>
+      <span className="mono" style={{ fontSize:'0.9rem', color:'#000', fontWeight:900, letterSpacing:'0.02em' }}>{time}</span>
     </div>
   );
 }
@@ -47,55 +72,120 @@ function ProgressBar({ value, status }) {
   );
 }
 
-// ── How It Works banner ───────────────────────────────────────────────────────
+// ── Execution Flow (Epic Masterpiece UI) ────────────────────────────────────
 function HowItWorks() {
+  const [hoveredIdx, setHoveredIdx] = React.useState(null);
+  
   const steps = [
-    { n:1, icon:'📋', label:'User submits AI job' },
-    { n:2, icon:'🤖', label:'Agent finds best provider' },
-    { n:3, icon:'⚙️', label:'Job executes on resource' },
-    { n:4, icon:'✔',  label:'Proof of Useful Work verified' },
-    { n:5, icon:'⛓️', label:'Payment settles on Hedera' },
+    { n:1, icon:'📋', label:'User submits AI job',          color:'#3b82f6', info:'Job parameters, budget, and requirements are encrypted and broadcast to the p2p network.' },
+    { n:2, icon:'🤖', label:'Agent finds best provider',    color:'#a855f7', info:'Autonomous Selector Agents analyze reputation, price, and latency to find the perfect compute node.' },
+    { n:3, icon:'⚙️', label:'Job executes on resource',    color:'#f59e0b', info:'The workload runs in an isolated TEE or container on the provider\'s hardware.' },
+    { n:4, icon:'✔',  label:'Proof of Useful Work',         color:'#10b981', info:'Results are validated by a network of Validator Agents to ensure cryptographic correctness.' },
+    { n:5, icon:'⛓️', label:'Payment settles on Hedera',   color:'#06b6d4', info:'Smart contracts release escrowed HBAR/COMPUTE tokens once validation is finalized.' },
   ];
   return (
-    <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)', padding:'16px 20px', marginBottom:24 }}>
-      <div style={{ fontSize:'0.68rem', fontWeight:800, color:'var(--text-muted)', letterSpacing:'0.1em', marginBottom:14 }}>HOW IT WORKS</div>
-      <div style={{ display:'flex', gap:0 }}>
-        {steps.map((s, i) => (
-          <div key={s.n} style={{ flex:1, position:'relative' }}>
-            {i < steps.length - 1 && (
-              <div style={{ position:'absolute', top:14, left:'60%', right:'-40%', height:1, background:'var(--border)', zIndex:0 }} />
-            )}
-            <div style={{ textAlign:'center', position:'relative', zIndex:1 }}>
-              <div style={{ width:28, height:28, borderRadius:'50%', margin:'0 auto 6px', background:'var(--bg)', border:'1px solid var(--border-bright)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.8rem' }}>
-                {s.icon}
+    <div className="card" style={{ padding:'28px', position:'relative', zIndex:1, overflow:'visible' }}>
+      <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'radial-gradient(circle at top left, rgba(255,255,255,0.03) 0%, transparent 70%)', pointerEvents:'none', zIndex:0 }} />
+      <div style={{ position:'relative', zIndex:1 }}>
+        <div style={{ fontSize:'0.85rem', fontWeight:900, background:'linear-gradient(90deg, #fff, #94a3b8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', letterSpacing:'0.15em', marginBottom:24, textTransform:'uppercase', filter:'drop-shadow(0 0 12px rgba(255,255,255,0.1))' }}>Execution Flow</div>
+        
+        <div style={{ display:'flex', flexDirection:'column', gap:0, position:'relative' }}>
+          
+          {/* Continuous Glowing Neon Spine */}
+          <div style={{ position:'absolute', top:20, bottom:20, left:19, width:2, background:'linear-gradient(180deg, #3b82f6 0%, #a855f7 25%, #f59e0b 50%, #10b981 75%, #06b6d4 100%)', zIndex:0, opacity:0.6, filter:'drop-shadow(0 0 4px rgba(255,255,255,0.3))' }} />
+
+          {steps.map((s, i) => (
+            <div 
+              key={s.n} 
+              style={{ display:'flex', gap:20, position:'relative', padding:'16px 0', alignItems:'center', cursor:'pointer', transition:'all 0.3s' }} 
+              onMouseEnter={() => setHoveredIdx(i)} 
+              onMouseLeave={() => setHoveredIdx(null)}
+            >
+              
+              {/* Deep Glass Node Icon */}
+              <div style={{ width:40, height:40, borderRadius:'50%', background:`linear-gradient(135deg, ${s.color}33, ${s.color}11)`, border:`1px solid ${s.color}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem', zIndex:2, flexShrink:0, boxShadow:`0 0 20px ${s.color}44, inset 0 0 12px ${s.color}22`, backdropFilter:'blur(4px)', transform: hoveredIdx===i ? 'scale(1.15) rotate(5deg)' : 'scale(1)', transition:'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }}>
+                <span style={{ filter:`drop-shadow(0 0 8px ${s.color})` }}>{s.icon}</span>
               </div>
-              <div style={{ fontSize:'0.62rem', color:'var(--text-secondary)', lineHeight:1.4, padding:'0 4px' }}>{s.label}</div>
+              
+              <div style={{ flex:1, position:'relative' }}>
+                <div style={{ fontSize:'0.65rem', color:s.color, fontWeight:900, textTransform:'uppercase', letterSpacing:'0.12em', marginBottom:4 }}>Phase 0{s.n}</div>
+                <div style={{ fontSize:'0.9rem', color:'var(--text-primary)', fontWeight:600, letterSpacing:'-0.01em', textShadow:'0 2px 4px rgba(0,0,0,0.5)', opacity: hoveredIdx!==null && hoveredIdx!==i ? 0.3 : 1, transition:'opacity 0.3s' }}>{s.label}</div>
+
+                {/* Floating Detail Mini-Page */}
+                {hoveredIdx === i && (
+                  <div style={{ 
+                    position:'absolute', 
+                    top: i === 4 ? 'auto' : '100%', 
+                    bottom: i === 4 ? '100%' : 'auto',
+                    left:0, width:'240px', background:'rgba(10, 11, 18, 0.95)', border:`1px solid ${s.color}`, borderRadius:'12px', padding:'12px', zIndex:10, 
+                    marginTop: i === 4 ? 0 : 10,
+                    marginBottom: i === 4 ? 10 : 0,
+                    boxShadow:`0 10px 30px rgba(0,0,0,0.8), 0 0 15px ${s.color}44`, backdropFilter:'blur(20px)', 
+                    animation: i === 4 ? 'fadeInUp 0.3s ease-out forwards' : 'fadeInDown 0.3s ease-out forwards', 
+                    pointerEvents:'none'
+                  }}>
+                    <div style={{ fontSize:'0.6rem', color:s.color, fontWeight:900, letterSpacing:'0.1em', marginBottom:4 }}>DETAILED PROTOCOL</div>
+                    <div style={{ fontSize:'0.75rem', color:'#f1f5f9', lineHeight:1.4, fontWeight:500 }}>{s.info}</div>
+                    <div style={{ marginTop:8, display:'flex', alignItems:'center', gap:4 }}>
+                      <div style={{ width:4, height:4, borderRadius:'50%', background:s.color }} />
+                      <div style={{ fontSize:'0.6rem', color:s.color, fontWeight:700 }}>VERIFIED ON HEDERA</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+      <style>{`
+        @keyframes fadeInDown {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
 
-// ── Powered by Hedera strip ───────────────────────────────────────────────────
+// ── Powered by Hedera sidebar (Interactive Network Infrastructure) ────────────
 function PoweredByHedera() {
-  const items = [
-    { icon:'📝', label:'HCS', desc:'Consensus logs & Proof of Useful Work' },
-    { icon:'🪙', label:'HTS', desc:'ComputeToken (COMPUTE) payments' },
-    { icon:'📜', label:'Smart Contract', desc:'Escrow & milestone settlement' },
-  ];
   return (
-    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:24 }}>
-      {items.map(item => (
-        <div key={item.label} style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--radius)', padding:'12px 14px', display:'flex', gap:10, alignItems:'flex-start' }}>
-          <span style={{ fontSize:'1.1rem' }}>{item.icon}</span>
-          <div>
-            <div style={{ fontSize:'0.75rem', fontWeight:800, color:'var(--accent)', marginBottom:2 }}>Hedera {item.label}</div>
-            <div style={{ fontSize:'0.68rem', color:'var(--text-muted)', lineHeight:1.4 }}>{item.desc}</div>
-          </div>
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      <div style={{ fontSize:'0.85rem', fontWeight:900, background:'linear-gradient(90deg, #fff, #94a3b8)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', letterSpacing:'0.15em', marginBottom:8, textTransform:'uppercase', filter:'drop-shadow(0 0 12px rgba(255,255,255,0.1))' }}>Network Infrastructure</div>
+      
+      <a href="https://hedera.com/consensus-service" target="_blank" rel="noopener noreferrer" className="card network-card" style={{ padding:'20px', display:'flex', alignItems:'center', gap:16, background:'linear-gradient(135deg, rgba(56,189,248,0.04) 0%, transparent 100%)', textDecoration:'none', cursor:'pointer' }}>
+        <div style={{ width:44, height:44, borderRadius:'50%', background:'linear-gradient(135deg, #0284c7, #38bdf8)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.2rem', fontWeight:800, color:'#fff', filter:'drop-shadow(0 0 8px #38bdf8)', flexShrink:0 }}>Ħ</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight:800, fontSize:'0.9rem', color:'#38bdf8', marginBottom:2 }}>Hedera HCS</div>
+          <div style={{ fontSize:'0.7rem', color:'var(--text-muted)' }}>Consensus logs & PoUW</div>
         </div>
-      ))}
+        <div style={{ fontSize:'0.9rem', color:'var(--border-bright)' }}>↗</div>
+      </a>
+      
+      <a href="https://hedera.com/token-service" target="_blank" rel="noopener noreferrer" className="card network-card" style={{ padding:'20px', display:'flex', alignItems:'center', gap:16, background:'linear-gradient(135deg, rgba(251,191,36,0.04) 0%, transparent 100%)', textDecoration:'none', cursor:'pointer' }}>
+        <div style={{ width:44, height:44, borderRadius:'50%', background:'linear-gradient(135deg, #f59e0b, #fbbf24)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem', fontWeight:800, color:'#000', filter:'drop-shadow(0 0 8px #f59e0b)', flexShrink:0 }}>C</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight:800, fontSize:'0.9rem', color:'#fbbf24', marginBottom:2 }}>Hedera HTS</div>
+          <div style={{ fontSize:'0.7rem', color:'var(--text-muted)' }}>COMPUTE Token payments</div>
+        </div>
+        <div style={{ fontSize:'0.9rem', color:'var(--border-bright)' }}>↗</div>
+      </a>
+      
+      <a href="https://hedera.com/smart-contract" target="_blank" rel="noopener noreferrer" className="card network-card" style={{ padding:'20px', display:'flex', alignItems:'center', gap:16, background:'linear-gradient(135deg, rgba(167,139,250,0.04) 0%, transparent 100%)', textDecoration:'none', cursor:'pointer' }}>
+        <div style={{ width:44, height:44, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          <span style={{ fontSize:'1.8rem', lineHeight:1, filter:'drop-shadow(0 0 10px #c084fc)' }}>📜</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight:800, fontSize:'0.9rem', color:'#c084fc', marginBottom:2 }}>Smart Contract</div>
+          <div style={{ fontSize:'0.7rem', color:'var(--text-muted)' }}>Escrow & settlement</div>
+        </div>
+        <div style={{ fontSize:'0.9rem', color:'var(--border-bright)' }}>↗</div>
+      </a>
     </div>
   );
 }
@@ -520,6 +610,55 @@ function ActivityLog({ logs }) {
   );
 }
 
+function PricingIntelligence({ job }) {
+  if (!job.pricingAnalysis && !job.pricingLog) return null;
+  
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <SectionLabel>🤖 Pricing Intelligence</SectionLabel>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        
+        {/* Analysis at Submission */}
+        {job.pricingAnalysis && (
+          <div style={{ padding: '12px 14px', borderRadius: 'var(--radius)', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Market Context (Submission)</div>
+              {(() => {
+                const color = job.pricingAnalysis.demandLevel === 'high' ? 'var(--red)' : job.pricingAnalysis.demandLevel === 'low' ? 'var(--green)' : 'var(--amber)';
+                return <span style={{ fontSize: '0.65rem', fontWeight: 900, color }}>{job.pricingAnalysis.demandLevel?.toUpperCase()} DEMAND</span>;
+              })()}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.4 }}>{job.pricingAnalysis.reason}</div>
+          </div>
+        )}
+
+        {/* Execution Metrics (Post-Completion) */}
+        {job.pricingLog && (
+          <div style={{ padding: '12px 14px', borderRadius: 'var(--radius)', background: 'var(--green-dim)', border: '1px solid var(--green)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: '0.65rem', color: 'var(--green)', fontWeight: 800, textTransform: 'uppercase' }}>Provider Settlement Logic</div>
+              <span style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--green)' }}>SETTLED</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: '0.6rem', color: 'rgba(52, 211, 153, 0.7)', fontWeight: 700 }}>EXECUTION TIME</div>
+                <div className="mono" style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 800 }}>{job.actualDurationSeconds}s</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.6rem', color: 'rgba(52, 211, 153, 0.7)', fontWeight: 700 }}>PROVIDER STATUS</div>
+                <div className="mono" style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 800 }}>{job.pricingLog.status?.toUpperCase()}</div>
+              </div>
+            </div>
+            <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(52, 211, 153, 0.2)', fontSize: '0.75rem', color: '#fff', opacity: 0.9 }}>
+              Automated feedback: <span style={{ fontWeight: 700 }}>Throughput recorded. Provider retained in high-priority registry.</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Job Card ──────────────────────────────────────────────────────────────────
 function JobCard({ job, isExpanded, onToggle, onSimulateFailure }) {
   const isActive = ['pending','matching','running'].includes(job.status);
@@ -581,6 +720,9 @@ function JobCard({ job, isExpanded, onToggle, onSimulateFailure }) {
           {/* Provider + Resource */}
           <ProviderPanel job={job} />
 
+          {/* Pricing Intelligence */}
+          <PricingIntelligence job={job} />
+
           {/* Hedera Contract + Payments */}
           <HederaContractPanel hedera={job.hedera} />
 
@@ -606,7 +748,7 @@ function JobCard({ job, isExpanded, onToggle, onSimulateFailure }) {
   );
 }
 
-// ── Stats strip ───────────────────────────────────────────────────────────────
+// ── Stats strip (Sidebar) ─────────────────────────────────────────────────────
 function StatsStrip({ jobs }) {
   const total     = jobs.length;
   const completed = jobs.filter(j => j.status==='completed').length;
@@ -669,53 +811,83 @@ export default function Dashboard() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8, flexWrap:'wrap', gap:16 }}>
-        <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20, flexWrap:'wrap', gap:28, padding:'14px 0' }}>
+        <div style={{ flex:1 }}>
           <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle" style={{ marginTop:4 }}>
-            AI agents autonomously allocate resources, execute jobs, verify work, and settle payments on Hedera.
+          <p className="page-subtitle" style={{ marginTop:8, fontSize:'1.05rem', color:'var(--text-secondary)', fontWeight:500, maxWidth:'620px', lineHeight:1.6, letterSpacing:'-0.01em', opacity:0.9 }}>
+            Autonomous AI agents orchestration engine. Monitoring resource allocation, cryptographic verification, and Hedera settlement in real-time.
           </p>
         </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          {lastUpdate && <span className="mono" style={{ fontSize:'0.65rem', color:'var(--text-muted)' }}>{lastUpdate.toLocaleTimeString()}</span>}
-          {activeCount > 0 && <span style={{ fontSize:'0.7rem', color:'var(--accent)', fontWeight:700 }}>● {activeCount} active</span>}
-          <Link to="/submit" className="btn btn-primary" style={{ fontSize:'0.85rem', padding:'8px 16px' }}>+ New Job</Link>
+        <div style={{ display:'flex', gap:20, alignItems:'center' }}>
+          {lastUpdate && <MiniClock />}
+          {activeCount > 0 && (
+            <div style={{ display:'flex', alignItems:'center', gap:8, background:'var(--accent-dim)', padding:'8px 16px', borderRadius:'24px', border:'1px solid var(--accent-mid)', boxShadow:'0 0 20px var(--accent-dim)' }}>
+              <span style={{ width:8, height:8, background:'var(--accent)', borderRadius:'50%', animation:'pulse 1.2s infinite' }} />
+              <span style={{ fontSize:'0.78rem', color:'var(--accent)', fontWeight:900, textTransform:'uppercase', letterSpacing:'0.08em' }}>{activeCount} ACTIVE AGENTS</span>
+            </div>
+          )}
+          <Link 
+            to="/submit" 
+            className="btn beast-btn" 
+            style={{ 
+              fontSize:'1rem', padding:'16px 32px', borderRadius:16, fontWeight:900, letterSpacing:'0.05em', height:'fit-content',
+              background:'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)',
+              color: '#fff',
+              textDecoration: 'none',
+              transition:'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              boxShadow:'0 10px 30px rgba(139, 92, 246, 0.4), inset 0 1px 1px rgba(255,255,255,0.3)'
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-6px) perspective(1000px) rotateX(10deg)';
+              e.currentTarget.style.boxShadow = '0 15px 45px rgba(139, 92, 246, 0.6)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'none';
+              e.currentTarget.style.boxShadow = '0 10px 30px rgba(139, 92, 246, 0.4), inset 0 1px 1px rgba(255,255,255,0.3)';
+            }}
+          >
+            + NEW JOB
+          </Link>
         </div>
       </div>
 
-      {/* How It Works */}
-      <div style={{ marginTop:20 }}>
-        <HowItWorks />
-      </div>
+      {/* ── NEW SIDEBAR LAYOUT ──────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 340px) 1fr', gap: '32px', alignItems: 'start', marginTop: 24 }}>
 
-      {/* Powered by Hedera */}
-      <PoweredByHedera />
-
-      {jobs.length === 0 ? (
-        <div className="card" style={{ textAlign:'center', padding:'60px 40px' }}>
-          <div style={{ fontSize:'2.5rem', marginBottom:16 }}>🔗</div>
-          <div style={{ fontWeight:700, marginBottom:8 }}>No jobs yet</div>
-          <p style={{ color:'var(--text-secondary)', fontSize:'0.88rem', marginBottom:24 }}>
-            Submit a job to see AI agents, Hedera smart contracts, escrow payments, and HCS logs in action.
-          </p>
-          <Link to="/submit" className="btn btn-primary">Submit a Job →</Link>
-        </div>
-      ) : (
-        <>
+        {/* Left Informational Sidebar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'sticky', top: 100 }}>
           <StatsStrip jobs={jobs} />
-          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            {jobs.map(j => (
-              <JobCard
-                key={j.id}
-                job={j}
-                isExpanded={expanded===j.id}
-                onToggle={() => setExpanded(p => p===j.id ? null : j.id)}
-                onSimulateFailure={handleSimulateFailure}
-              />
-            ))}
-          </div>
-        </>
-      )}
+          <HowItWorks />
+          <PoweredByHedera />
+        </div>
+
+        {/* Right Job Explorer */}
+        <div>
+          {jobs.length === 0 ? (
+            <div className="card" style={{ textAlign:'center', padding:'60px 40px' }}>
+              <div style={{ fontSize:'2.5rem', marginBottom:16 }}>🔗</div>
+              <div style={{ fontWeight:700, marginBottom:8 }}>No jobs yet</div>
+              <p style={{ color:'var(--text-secondary)', fontSize:'0.88rem', marginBottom:24 }}>
+                Submit a job to see AI agents, Hedera smart contracts, escrow payments, and HCS logs in action.
+              </p>
+              <Link to="/submit" className="btn btn-primary">Submit a Job →</Link>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+              {jobs.map(j => (
+                <JobCard
+                  key={j.id}
+                  job={j}
+                  isExpanded={expanded===j.id}
+                  onToggle={() => setExpanded(p => p===j.id ? null : j.id)}
+                  onSimulateFailure={handleSimulateFailure}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   );
 }

@@ -1,12 +1,12 @@
 /**
  * agentService.js — AI Agent Orchestrator with Hedera + Reputation
- * Realistic 30-45s execution timing with gradual progress updates.
  */
 
-const { getProviders, boostReputation, penaliseReputation } = require('./providerService');
-const { updateJob, appendLog, JOB_STATUS } = require('../models/jobStore');
-const hedera     = require('./hederaService');
-const realHedera = require('./realHederaService');
+import { getProviders, boostReputation, penaliseReputation } from './providerService.js';
+import { updateJob, appendLog, JOB_STATUS, getJob } from '../models/jobStore.js';
+import * as hedera from './hederaService.js';
+import * as realHedera from './realHederaService.js';
+import pricingAgent from './pricingAgent.js';
 
 const RESOURCE_CATEGORY = {
   'gpu-training':         'gpu-training',
@@ -22,7 +22,7 @@ const RESOURCE_CATEGORY = {
   'general':              'model-inference',
 };
 
-function scoreProvider(provider, job) {
+export function scoreProvider(provider, job) {
   let score = 0;
   const category = RESOURCE_CATEGORY[job.jobType] || 'model-inference';
   if (provider.resourceType === category)              score += 35;
@@ -36,14 +36,13 @@ function scoreProvider(provider, job) {
   return Math.round(score);
 }
 
-function selectProvider(job) {
+export function selectProvider(job) {
   const providers = getProviders().filter(p => p.status === 'active');
   return providers
     .map(p => ({ ...p, score: scoreProvider(p, job) }))
     .sort((a, b) => b.score - a.score)[0] || null;
 }
 
-// ── Output generators ─────────────────────────────────────────────────────────
 function generateOutput(jobType, provider) {
   const category = RESOURCE_CATEGORY[jobType] || 'model-inference';
   if (category === 'gpu-training') {
@@ -76,7 +75,6 @@ function generateOutput(jobType, provider) {
   }
 }
 
-// ── Realistic execution steps (~30-45s total) ─────────────────────────────────
 function getExecutionSteps(jobType) {
   const category = RESOURCE_CATEGORY[jobType] || 'model-inference';
   const steps = {
@@ -119,16 +117,21 @@ function getExecutionSteps(jobType) {
   return steps[category] || steps['model-inference'];
 }
 
-// ── Main job runner ───────────────────────────────────────────────────────────
-async function runJob(jobId, job) {
+export async function runJob(jobId, job) {
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   let selectedProviderId = null;
 
   try {
-    // STAGE 0: Buyer Agent
     updateJob(jobId, { status: JOB_STATUS.MATCHING, progress: 0 });
     appendLog(jobId, 'Buyer Agent: Job received. Validating requirements...');
+    const startTime = Date.now();
+    updateJob(jobId, { startedAt: new Date().toISOString() });
     await delay(1500);
+
+    const category = RESOURCE_CATEGORY[job.jobType] || 'model-inference';
+    const pricingAnalysis = pricingAgent.analyseMarket(category);
+    updateJob(jobId, { pricingAnalysis });
+    appendLog(jobId, `Pricing Agent: ${pricingAnalysis.reason}`);
 
     let contract = hedera.createEscrowContract(jobId, job.budget);
     contract = hedera.appendHcsMessage(contract, `[HCS] Job ${jobId} created. Escrow deployed: ${contract.contractId}`);
@@ -137,7 +140,6 @@ async function runJob(jobId, job) {
     appendLog(jobId, `Buyer Agent: ${contract.totalTokens} ${hedera.TOKEN_SYMBOL} locked in escrow.`);
     await delay(1500);
 
-    // STAGE 1: Selector Agent
     updateJob(jobId, { status: JOB_STATUS.MATCHING, progress: 10 });
     appendLog(jobId, 'Selector Agent: Scoring providers by price, performance, and reputation...');
     await delay(2000);
@@ -163,14 +165,12 @@ async function runJob(jobId, job) {
     appendLog(jobId, `Selector Agent: Selected → ${provider.name} | Reputation: ${provider.reputation}/10 | Success: ${provider.successRate}% | Score: ${scoreProvider(provider, job)}`);
     await delay(1000);
 
-    // Release M1
     contract = hedera.releaseMilestone(contract, 'M1');
     contract = hedera.appendHcsMessage(contract, `[HCS] M1 released: ${contract.milestones[0].tokens} ${hedera.TOKEN_SYMBOL} → ${provider.name}. TX: ${contract.milestones[0].txId}`);
     updateJob(jobId, { hedera: contract });
     appendLog(jobId, `Hedera: M1 payment — ${contract.milestones[0].tokens} ${hedera.TOKEN_SYMBOL} released to provider.`);
     await delay(800);
 
-    // STAGE 2: Provider execution steps
     const steps = getExecutionSteps(job.jobType);
     for (const step of steps) {
       await delay(step.delay);
@@ -187,18 +187,15 @@ async function runJob(jobId, job) {
       }
     }
 
-    // STAGE 3: Complete
     await delay(1000);
     const output = generateOutput(job.jobType, provider);
 
-    // Real Hedera TX
     appendLog(jobId, 'Hedera: Sending real on-chain completion transaction...');
     const realTx = await realHedera.sendCompletionPayment(jobId, job.title);
     const realTxData = realTx.success
       ? { realTxId: realTx.transactionId, realTxStatus: realTx.status, realTxNetwork: realTx.network, realTxUrl: realTx.explorerUrl, realTxSentAt: realTx.sentAt }
       : { realTxId: null, realTxStatus: 'SIMULATION_MODE', realTxError: realTx.error };
 
-    // Release M4
     contract = hedera.releaseMilestone(contract, 'M4');
     const m4 = contract.milestones.find(m => m.id === 'M4');
     contract = hedera.appendHcsMessage(contract, `[HCS] M4 (final) released: ${m4.tokens} ${hedera.TOKEN_SYMBOL} → ${provider.name}. TX: ${m4.txId}`);
@@ -213,15 +210,17 @@ async function runJob(jobId, job) {
       appendLog(jobId, `🔗 HashScan: ${realTx.explorerUrl}`);
     }
 
-    // Boost provider reputation
     boostReputation(provider.id);
     appendLog(jobId, `System: Provider reputation updated (+0.1) → ${provider.name}`);
 
-  } catch (err) {
-    // Failure path — penalise provider, refund buyer
-    if (selectedProviderId) penaliseReputation(selectedProviderId);
+    const actualDurationSeconds = Math.round((Date.now() - startTime) / 1000);
+    const pricingLog = pricingAgent.recordJobComplete(provider.id, actualDurationSeconds);
+    updateJob(jobId, { actualDurationSeconds, pricingLog });
+    appendLog(jobId, `Pricing Agent: Job recorded. Provider status: ${pricingLog.status}.`);
 
-    const currentJob = require('../models/jobStore').getJob(jobId);
+  } catch (err) {
+    if (selectedProviderId) penaliseReputation(selectedProviderId);
+    const currentJob = getJob(jobId);
     if (currentJob?.hedera) {
       let contract = currentJob.hedera;
       contract = hedera.terminateContract(contract, err.message);
@@ -236,9 +235,7 @@ async function runJob(jobId, job) {
   }
 }
 
-// ── Simulate failure (called from route for demo button) ─────────────────────
-async function simulateFailure(jobId) {
-  const { getJob } = require('../models/jobStore');
+export async function simulateFailure(jobId) {
   const job = getJob(jobId);
   if (!job || job.status === JOB_STATUS.COMPLETED || job.status === JOB_STATUS.FAILED) return;
 
@@ -262,5 +259,3 @@ async function simulateFailure(jobId) {
   }
   appendLog(jobId, 'System: Further payments halted. Escrow settlement complete.');
 }
-
-module.exports = { runJob, selectProvider, simulateFailure };

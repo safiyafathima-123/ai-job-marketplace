@@ -1,9 +1,7 @@
 /**
  * providerService.js — AI Resource Marketplace Provider Registry
- * Providers now have jobsCompleted, successRate, and mutable reputation.
  */
 
-// Mutable reputation store — updated on job success/failure
 const reputationStore = new Map();
 
 const PROVIDERS = [
@@ -23,6 +21,8 @@ const PROVIDERS = [
     reputation: 9.8,
     jobsCompleted: 1284,
     successRate: 99.2,
+    jobsThisSession: 0,
+    lastPricingAction: null
   },
   {
     id: 'prov-gpu-002',
@@ -40,6 +40,8 @@ const PROVIDERS = [
     reputation: 8.1,
     jobsCompleted: 876,
     successRate: 95.8,
+    jobsThisSession: 0,
+    lastPricingAction: null
   },
   {
     id: 'prov-inf-001',
@@ -57,6 +59,8 @@ const PROVIDERS = [
     reputation: 9.7,
     jobsCompleted: 3421,
     successRate: 98.9,
+    jobsThisSession: 0,
+    lastPricingAction: null
   },
   {
     id: 'prov-inf-002',
@@ -74,6 +78,8 @@ const PROVIDERS = [
     reputation: 8.9,
     jobsCompleted: 2108,
     successRate: 96.4,
+    jobsThisSession: 0,
+    lastPricingAction: null
   },
   {
     id: 'prov-inf-003',
@@ -91,6 +97,8 @@ const PROVIDERS = [
     reputation: 9.9,
     jobsCompleted: 1897,
     successRate: 99.5,
+    jobsThisSession: 0,
+    lastPricingAction: null
   },
   {
     id: 'prov-sto-001',
@@ -108,6 +116,8 @@ const PROVIDERS = [
     reputation: 9.5,
     jobsCompleted: 5632,
     successRate: 99.8,
+    jobsThisSession: 0,
+    lastPricingAction: null
   },
   {
     id: 'prov-sto-002',
@@ -125,35 +135,62 @@ const PROVIDERS = [
     reputation: 7.8,
     jobsCompleted: 2341,
     successRate: 94.2,
+    jobsThisSession: 0,
+    lastPricingAction: null
   },
 ];
 
-// Seed reputation store
 PROVIDERS.forEach(p => reputationStore.set(p.id, p.reputation));
 
-function getProviders() {
+export function getProviders() {
   return PROVIDERS.map(p => ({
     ...p,
     reputation: parseFloat((reputationStore.get(p.id) || p.reputation).toFixed(1)),
   }));
 }
 
-function getProvider(id) {
+export function getProvider(id) {
   const p = PROVIDERS.find(p => p.id === id);
   if (!p) return null;
   return { ...p, reputation: parseFloat((reputationStore.get(p.id) || p.reputation).toFixed(1)) };
 }
 
-// Called after successful job — slightly boost reputation (max 10)
-function boostReputation(providerId) {
+export function boostReputation(providerId) {
+  const p = PROVIDERS.find(p => p.id === providerId);
+  if (p) p.jobsThisSession = (p.jobsThisSession || 0) + 1;
   const current = reputationStore.get(providerId) || 8;
   reputationStore.set(providerId, Math.min(10, parseFloat((current + 0.1).toFixed(1))));
 }
 
-// Called after failed job — reduce reputation (min 1)
-function penaliseReputation(providerId) {
+export function penaliseReputation(providerId) {
   const current = reputationStore.get(providerId) || 8;
   reputationStore.set(providerId, Math.max(1, parseFloat((current - 0.5).toFixed(1))));
 }
 
-module.exports = { getProviders, getProvider, boostReputation, penaliseReputation };
+export function registerProvider(data) {
+  if (!data.name || !data.resourceType || !data.pricePerTask) {
+    throw new Error('Missing required provider registry fields.');
+  }
+
+  const newProvider = {
+    id: `prov-new-${Date.now()}`,
+    name: data.name,
+    description: data.description || 'New dynamic resource provider.',
+    resourceType: data.resourceType,
+    specialties: [data.resourceType, 'general'],
+    specs: data.specs || { tier: 'standard latency' },
+    costPerTask: parseFloat(data.pricePerTask),
+    walletAddress: data.walletAddress || '0x0.mock.hedera',
+    status: 'active',
+    tier: 'standard',
+    reputation: 7.0,
+    jobsCompleted: 0,
+    successRate: 100,
+    jobsThisSession: 0,
+    lastPricingAction: null
+  };
+
+  PROVIDERS.push(newProvider);
+  reputationStore.set(newProvider.id, 7.0);
+  return newProvider;
+}
