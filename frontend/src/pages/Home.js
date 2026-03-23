@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchProviders } from '../services/api';
+import ComputeXLogo from '../components/ComputeXLogo';
 
 /* ─── Data ────────────────────────────────────────────────────── */
 const FEATURES = [
@@ -97,12 +98,12 @@ const CSS = `
     color: #e2e8f0;
     position: relative;
     overflow-x: hidden;
-    transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease;
-    perspective: 2000px;
+    scroll-behavior: smooth;
   }
   .hp-root.launching {
     pointer-events: none;
     animation: rocketLift 1.2s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+    transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.8s ease;
   }
   @keyframes rocketLift {
     0% { transform: translateY(0); opacity: 1; }
@@ -148,7 +149,8 @@ const CSS = `
     border-radius: 50%;
     pointer-events: none;
     z-index: 0;
-    filter: blur(80px);
+    filter: blur(40px);
+    will-change: transform;
   }
   .hp-orb-1 {
     width: 600px; height: 600px;
@@ -227,8 +229,8 @@ const CSS = `
   }
 
   .hp-h1 {
-    font-size: clamp(2.8rem, 6vw, 4.2rem);
-    font-weight: 900; line-height: 1.1;
+    font-size: clamp(2.4rem, 5vw, 3.8rem);
+    font-weight: 500; line-height: 1.2;
     letter-spacing: -0.03em;
     margin: 0 0 24px;
     color: #f8fafc;
@@ -248,6 +250,7 @@ const CSS = `
     background: linear-gradient(90deg, #a78bfa 0%, #60a5fa 40%, #34d399 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
+    text-shadow: 0 0 15px rgba(96, 165, 250, 0.25); /* Subtle Neon */
   }
 
   .hp-sub {
@@ -373,26 +376,25 @@ const CSS = `
     width: 380px; height: 380px;
     border-radius: 50%;
     background: conic-gradient(from 180deg at 50% 50%, rgba(130,89,239,0.4) 0deg, rgba(52,211,153,0.4) 120deg, rgba(15,23,42,0) 240deg, rgba(130,89,239,0.4) 360deg);
-    filter: blur(40px);
+    filter: blur(30px);
     animation: slowSpin 10s linear infinite;
     position: absolute;
     z-index: 0;
+    will-change: transform;
   }
-  .hp-hero-glass-card {
+  .hp-hero-logo-wrap {
     width: 100%;
-    max-width: 420px;
-    background: linear-gradient(145deg, rgba(15, 23, 42, 0.6), rgba(15, 23, 42, 0.2));
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 24px;
-    box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
-    backdrop-filter: blur(24px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
     position: relative;
     z-index: 2;
-    display: flex;
-    flex-direction: column;
-    padding: 32px;
-    animation: floatCard 6s ease-in-out infinite;
+    animation: epicFloat 8s ease-in-out infinite;
     transform-style: preserve-3d;
+  }
+  @keyframes epicFloat {
+    0%, 100% { transform: translateY(0) rotateY(-5deg) rotateX(2deg); }
+    50% { transform: translateY(-40px) rotateY(10deg) rotateX(-2deg); }
   }
   .hp-hero-floating-badge {
     position: absolute;
@@ -410,7 +412,6 @@ const CSS = `
   }
 
   @keyframes slowSpin { 100% { transform: rotate(360deg); } }
-  @keyframes floatCard { 0%, 100% { transform: translateY(0) rotateX(5deg) rotateY(-10deg); } 50% { transform: translateY(-20px) rotateX(8deg) rotateY(-5deg); } }
   @keyframes slowFloat { 0%, 100% { transform: translateY(0) translateZ(30px); } 50% { transform: translateY(12px) translateZ(40px); } }
 
   /* ── Divider ── */
@@ -1173,8 +1174,8 @@ export default function Home() {
   const shimmerTimer = useRef(null);
   const navigate = useNavigate();
 
-  /* Unified open section state. 'features' open by default to show off the cool cards */
-  const [expandedSection, setExpandedSection] = useState('features');
+  /* Unified open section state. All sections collapsed by default for a clean entry. */
+  const [expandedSection, setExpandedSection] = useState(null);
 
   useEffect(() => {
     fetchProviders()
@@ -1222,7 +1223,7 @@ export default function Home() {
   return (
     <div className={`hp-root ${isLaunching ? 'launching' : ''}`} style={expandedSection === 'features' ? featVars : {}}>
       <style>{CSS}</style>
-      
+
       {isLaunching && (
         <>
           <div className="hp-rocket-overlay">
@@ -1249,8 +1250,8 @@ export default function Home() {
               </div>
 
               <h1 className="hp-h1">
-                <span className="hp-h1-grad" style={{ fontSize:'1.2em', textTransform:'uppercase' }}>Marketplace</span>
-                <span style={{ fontSize:'0.8em', display:'block', marginTop:10, color:'#94a3b8', fontWeight:700 }}>Agents handle the rest.</span>
+                <span className="hp-h1-grad" style={{ fontSize: '0.9em', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.08em' }}>THE SYNDICATE</span>
+                <span style={{ fontSize: '0.5em', display: 'block', marginTop: 10, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.15em', opacity: 0.7 }}>UNIFIED AUTONOMOUS GPU ORCHESTRATION LAYER</span>
               </h1>
 
               <p className="hp-sub">
@@ -1258,9 +1259,9 @@ export default function Home() {
               </p>
 
               <div className="hp-btns">
-                <div 
-                  onClick={handleLaunch} 
-                  className="hp-btn-video-wrap" 
+                <div
+                  onClick={handleLaunch}
+                  className="hp-btn-video-wrap"
                   style={{ cursor: 'pointer' }}
                 >
                   <video autoPlay loop muted playsInline className="hp-btn-video-bg">
@@ -1277,25 +1278,11 @@ export default function Home() {
             {/* Premium Interactive Visual Box */}
             <div className="hp-hero-visual">
               <div className="hp-hero-orb" />
-              
-              <div className="hp-hero-glass-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontFamily: 'monospace', letterSpacing: '0.1em' }}>// LIVE_EXECUTION</div>
-                  <div style={{ color: '#34d399', fontSize: '1rem', textShadow: '0 0 10px #34d399' }}>●</div>
-                </div>
-                
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ height: '12px', width: '85%', background: 'linear-gradient(90deg, rgba(255,255,255,0.1), transparent)', borderRadius: '6px' }} />
-                  <div style={{ height: '12px', width: '65%', background: 'linear-gradient(90deg, rgba(255,255,255,0.1), transparent)', borderRadius: '6px' }} />
-                  <div style={{ height: '12px', width: '90%', background: 'linear-gradient(90deg, rgba(255,255,255,0.1), transparent)', borderRadius: '6px' }} />
-                </div>
-                
-                <div style={{ marginTop: '32px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', color: '#cbd5e1', fontSize: '0.9rem', fontWeight: 600 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{fontSize: '1.2rem'}}>⚡</span> Matching Agents...</span>
-                  <span style={{ color: '#a78bfa', textShadow: '0 0 10px rgba(167,139,250,0.5)' }}>98.4% Fit</span>
-                </div>
+
+              <div className="hp-hero-logo-wrap">
+                <ComputeXLogo size={480} />
               </div>
-              
+
               <div className="hp-hero-floating-badge">Agent Active</div>
             </div>
           </section>
@@ -1305,8 +1292,8 @@ export default function Home() {
           {/* ══════════════ METRICS ══════════════ */}
           <div className="hp-metrics">
             {METRICS.map(m => (
-              <div 
-                className="hp-metric" 
+              <div
+                className="hp-metric"
                 key={m.label}
                 style={{ '--metric-color': m.color, '--metric-glow': m.glow }}
               >
@@ -1323,7 +1310,7 @@ export default function Home() {
 
           {/* ══════════════ UNIFIED ACCORDION LAYOUT ══════════════ */}
           <div className="hp-accordion-container">
-            
+
             {/* 1. ABOUT US */}
             <SectionAccordion
               id="about"
@@ -1362,8 +1349,8 @@ export default function Home() {
                       className={`hp-feat-item ${activeFeature === i ? 'active' : ''}`}
                       style={{
                         '--feat-accent': f.accent,
-                        '--feat-glow':   f.glow,
-                        '--feat-grad':   f.grad,
+                        '--feat-glow': f.glow,
+                        '--feat-grad': f.grad,
                         '--feat-border': f.border,
                       }}
                     >
@@ -1373,7 +1360,7 @@ export default function Home() {
                           <div className="hp-feat-title">{f.title}</div>
                           <div className="hp-feat-tagline">{f.tagline}</div>
                         </div>
-                        <span 
+                        <span
                           className="hp-feat-arrow"
                           style={{ cursor: 'pointer', padding: '8px' }}
                           onClick={(e) => { e.stopPropagation(); handleFeatureChange(i); }}
