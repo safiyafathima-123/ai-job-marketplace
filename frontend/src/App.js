@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import './index.css';
+
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 import Home from './pages/Home';
 import SubmitJob from './pages/SubmitJob';
 import Dashboard from './pages/Dashboard';
@@ -50,7 +52,7 @@ function WalletModal({ onClose, onConnected }) {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/wallet/connect', {
+      const res = await fetch(`${API_BASE}/wallet/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountId, providerName: selectedProvider })
@@ -152,7 +154,7 @@ function Nav() {
   useEffect(() => {
     const checkWallet = async () => {
       try {
-        const res = await fetch('/api/wallet');
+        const res = await fetch(`${API_BASE}/wallet`);
         const data = await res.json();
         if (data.connected) {
           setWallet(data);
@@ -171,7 +173,7 @@ function Nav() {
 
   const handleDisconnect = async () => {
     try {
-      await fetch('/api/wallet/disconnect', { method: 'POST' });
+      await fetch(`${API_BASE}/wallet/disconnect`, { method: 'POST' });
       setWallet(null);
     } catch (err) {
       console.error('Disconnect error:', err);
