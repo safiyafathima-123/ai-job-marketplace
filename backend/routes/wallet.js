@@ -8,8 +8,8 @@ router.get('/', (req, res) => {
 });
 
 router.post('/connect', (req, res) => {
-  const { accountId, privateKey } = req.body;
-  const result = walletService.connectWallet(accountId, privateKey);
+  const { accountId, providerName } = req.body;
+  const result = walletService.connectWallet(accountId, providerName);
   
   if (!result.success) {
     return res.status(400).json(result);

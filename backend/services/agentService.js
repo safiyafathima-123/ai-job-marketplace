@@ -1,5 +1,6 @@
 /**
  * agentService.js — AI Agent Orchestrator with Hedera + Reputation
+ *                   Multi-provider heavy job distribution supported.
  */
 
 import { getProviders, boostReputation, penaliseReputation } from './providerService.js';
@@ -22,6 +23,41 @@ const RESOURCE_CATEGORY = {
   'general':              'model-inference',
 };
 
+// ── Complexity Analysis ───────────────────────────────────────────────────────
+
+/**
+ * Determines if a job is "heavy" and should be distributed across multiple providers.
+ * Returns { isHeavy, reason, numProviders, subTaskLabels }
+ */
+export function analyseJobComplexity(job) {
+  const budget = parseFloat(job.budget) || 0;
+  const category = RESOURCE_CATEGORY[job.jobType] || 'model-inference';
+
+  // GPU Training: heavy if budget ≥ $0.05 → split into 2 parallel sub-tasks
+  if (category === 'gpu-training' && budget >= 0.05) {
+    return {
+      isHeavy: true,
+      reason: `Large GPU training workload detected (budget $${budget}). Splitting across 2 GPU clusters for parallelised epoch computation.`,
+      numProviders: 2,
+      subTaskLabels: ['Epochs 1–4 (Primary Cluster)', 'Epochs 5–8 (Secondary Cluster)'],
+    };
+  }
+
+  // Any job type: very high budget → split across 3 providers
+  if (budget >= 0.10) {
+    return {
+      isHeavy: true,
+      reason: `High-throughput job detected (budget $${budget}). Distributing workload across 3 specialised providers for redundancy and speed.`,
+      numProviders: 3,
+      subTaskLabels: ['Primary Shard', 'Secondary Shard', 'Validation Shard'],
+    };
+  }
+
+  return { isHeavy: false, reason: null, numProviders: 1, subTaskLabels: [] };
+}
+
+// ── Provider Selection ────────────────────────────────────────────────────────
+
 export function scoreProvider(provider, job) {
   let score = 0;
   const category = RESOURCE_CATEGORY[job.jobType] || 'model-inference';
@@ -31,7 +67,7 @@ export function scoreProvider(provider, job) {
   const costRatio = provider.costPerTask / job.budget;
   if (costRatio <= 1) score += 25 * (1 - costRatio * 0.5);
   if (provider.accuracy >= (job.requiredAccuracy || 90)) score += 10;
-  // Reputation now contributes to score (up to 5 pts)
+  // Reputation contributes up to 5 pts
   score += (provider.reputation / 10) * 5;
   return Math.round(score);
 }
@@ -42,6 +78,19 @@ export function selectProvider(job) {
     .map(p => ({ ...p, score: scoreProvider(p, job) }))
     .sort((a, b) => b.score - a.score)[0] || null;
 }
+
+/**
+ * Returns the top-N distinct active providers by score (no duplicates).
+ */
+export function selectMultipleProviders(job, n) {
+  const providers = getProviders().filter(p => p.status === 'active');
+  return providers
+    .map(p => ({ ...p, score: scoreProvider(p, job) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, n);
+}
+
+// ── Output Generation ─────────────────────────────────────────────────────────
 
 function generateOutput(jobType, provider) {
   const category = RESOURCE_CATEGORY[jobType] || 'model-inference';
@@ -74,6 +123,8 @@ function generateOutput(jobType, provider) {
     return { type:'data-storage', summary:'Data stored and verified', fileName:`dataset_${Date.now()}.parquet`, fileSize:`${(Math.random()*900+100).toFixed(1)} MB`, storageId:`vslt-${hash}`, redundancy:provider.specs?.redundancy||'2x', encryption:provider.specs?.encryption||'AES-256', retrievalUrl:`https://storage.vaultai.io/${hash}`, checksumVerified:true, storedAt:new Date().toISOString() };
   }
 }
+
+// ── Execution Steps ───────────────────────────────────────────────────────────
 
 function getExecutionSteps(jobType) {
   const category = RESOURCE_CATEGORY[jobType] || 'model-inference';
@@ -117,7 +168,205 @@ function getExecutionSteps(jobType) {
   return steps[category] || steps['model-inference'];
 }
 
+// ── Sub-task helper (used by runHeavyJob) ─────────────────────────────────────
+
+/**
+ * Runs a single sub-task for a given provider.
+ * Updates job.subTasks[index] live so the frontend can poll it.
+ */
+async function runSubTask(jobId, job, provider, subTaskLabel, subTaskIndex, subTaskBudget) {
+  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Helper: mutate the specific sub-task inside the job and persist
+  const updateSubTask = (patch) => {
+    const current = getJob(jobId);
+    if (!current) return;
+    const subTasks = [...(current.subTasks || [])];
+    subTasks[subTaskIndex] = { ...(subTasks[subTaskIndex] || {}), ...patch };
+    updateJob(jobId, { subTasks });
+  };
+
+  const subJobForEscrow = { ...job, budget: subTaskBudget };
+  let contract = hedera.createEscrowContract(`${jobId}-st${subTaskIndex}`, subTaskBudget);
+
+  updateSubTask({
+    label: subTaskLabel,
+    providerName: provider.name,
+    providerId: provider.id,
+    providerTier: provider.tier,
+    providerReputation: provider.reputation,
+    providerScore: scoreProvider(provider, job),
+    status: 'matching',
+    progress: 0,
+    contractId: contract.contractId,
+    logs: [],
+  });
+
+  appendLog(jobId, `Orchestrator Agent: [${subTaskLabel}] → Assigned to ${provider.name} | Score: ${scoreProvider(provider, job)}`);
+
+  contract = hedera.appendHcsMessage(contract, `[HCS] Sub-task "${subTaskLabel}" created. Escrow: ${contract.contractId}`);
+  updateSubTask({ contractId: contract.contractId, status: 'matching', progress: 10 });
+  await delay(800);
+
+  // Release M1 (provider acceptance)
+  contract = hedera.releaseMilestone(contract, 'M1');
+  const m1 = contract.milestones.find(m => m.id === 'M1');
+  contract = hedera.appendHcsMessage(contract, `[HCS] Sub-task M1 released: ${m1.tokens} COMPUTE → ${provider.name}`);
+  appendLog(jobId, `Hedera: [${subTaskLabel}] M1 payment — ${m1.tokens} COMPUTE released to ${provider.name}.`);
+  updateSubTask({ status: 'running', progress: 20 });
+  await delay(600);
+
+  // Run execution steps
+  const steps = getExecutionSteps(job.jobType);
+  for (const step of steps) {
+    await delay(step.delay * 0.7); // slightly faster than single-provider (parallelism benefit)
+    if (step.milestone && (step.milestone === 'M2' || step.milestone === 'M3')) {
+      contract = hedera.releaseMilestone(contract, step.milestone);
+      const ms = contract.milestones.find(m => m.id === step.milestone);
+      contract = hedera.appendHcsMessage(contract, `[HCS] Sub-task ${step.milestone} released: ${ms.tokens} COMPUTE → ${provider.name}`);
+      appendLog(jobId, `Hedera: [${subTaskLabel}] ${step.milestone} — ${ms.tokens} COMPUTE released. TX: ${ms.txId}`);
+    }
+    updateSubTask({ status: 'running', progress: step.progress });
+    appendLog(jobId, `[${subTaskLabel}] ${step.log}`);
+  }
+
+  // Final output
+  const output = generateOutput(job.jobType, provider);
+
+  // Release M4 (final)
+  contract = hedera.releaseMilestone(contract, 'M4');
+  const m4 = contract.milestones.find(m => m.id === 'M4');
+  contract = hedera.appendHcsMessage(contract, `[HCS] Sub-task M4 (final) released: ${m4.tokens} COMPUTE → ${provider.name}`);
+  contract = hedera.completeContract(contract);
+  appendLog(jobId, `Hedera: [${subTaskLabel}] M4 final payment — ${m4.tokens} COMPUTE. Contract closed.`);
+
+  updateSubTask({ status: 'completed', progress: 100, output, hedera: contract });
+  boostReputation(provider.id);
+  appendLog(jobId, `Orchestrator Agent: [${subTaskLabel}] ✔ Completed by ${provider.name}. Reputation boosted.`);
+
+  return { output, provider, contract };
+}
+
+// ── Heavy Job Orchestration ───────────────────────────────────────────────────
+
+export async function runHeavyJob(jobId, job, complexity) {
+  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const startTime = Date.now();
+
+  try {
+    updateJob(jobId, { status: JOB_STATUS.MATCHING, progress: 0, isDistributed: true, startedAt: new Date().toISOString() });
+    appendLog(jobId, `Buyer Agent: Job received. Validating requirements...`);
+    await delay(1000);
+
+    // Pricing analysis
+    const category = RESOURCE_CATEGORY[job.jobType] || 'model-inference';
+    const pricingAnalysis = pricingAgent.analyseMarket(category);
+    updateJob(jobId, { pricingAnalysis });
+    appendLog(jobId, `Pricing Agent: ${pricingAnalysis.reason}`);
+    await delay(800);
+
+    // Announce orchestration
+    appendLog(jobId, `🤖 Orchestrator Agent: Heavy workload detected — splitting into ${complexity.numProviders} parallel sub-tasks.`);
+    appendLog(jobId, `🤖 Orchestrator Agent: Reason — ${complexity.reason}`);
+    await delay(1000);
+
+    // Score & select N providers
+    appendLog(jobId, `Selector Agent: Scoring all providers — selecting top ${complexity.numProviders} for parallel allocation...`);
+    await delay(1500);
+
+    const providers = selectMultipleProviders(job, complexity.numProviders);
+    if (providers.length < 1) throw new Error('No suitable providers found for distributed execution.');
+
+    const actualN = Math.min(providers.length, complexity.numProviders);
+    const subBudget = (parseFloat(job.budget) / actualN).toFixed(5);
+
+    // Initialise subTasks array
+    updateJob(jobId, {
+      subTasks: complexity.subTaskLabels.slice(0, actualN).map((label, i) => ({
+        label,
+        providerName: providers[i]?.name || '—',
+        status: 'pending',
+        progress: 0,
+        contractId: null,
+      })),
+      status: JOB_STATUS.MATCHING,
+      progress: 15,
+    });
+
+    providers.slice(0, actualN).forEach((p, i) => {
+      appendLog(jobId, `Selector Agent: [Slot ${i + 1}] → ${p.name} | Tier: ${p.tier} | Score: ${scoreProvider(p, job)} | Reputation: ${p.reputation}/10`);
+    });
+    await delay(1000);
+
+    updateJob(jobId, { status: JOB_STATUS.DISTRIBUTED, progress: 20 });
+    appendLog(jobId, `🤖 Orchestrator Agent: Launching ${actualN} parallel sub-tasks now...`);
+
+    // Run all sub-tasks in parallel
+    const results = await Promise.all(
+      providers.slice(0, actualN).map((provider, i) =>
+        runSubTask(jobId, job, provider, complexity.subTaskLabels[i] || `Sub-task ${i + 1}`, i, subBudget)
+      )
+    );
+
+    // Aggregate progress from completed sub-tasks
+    // The overall job progress tracks the average of all sub-tasks
+    const overallProgress = Math.round(
+      (getJob(jobId)?.subTasks || []).reduce((sum, st) => sum + (st.progress || 0), 0) / actualN
+    );
+    updateJob(jobId, { progress: overallProgress });
+
+    await delay(800);
+    appendLog(jobId, `🤖 Orchestrator Agent: All ${actualN} sub-tasks completed. Aggregating outputs...`);
+    await delay(1000);
+
+    // Aggregate output — use first sub-task's output as the master output
+    const masterOutput = results[0]?.output;
+
+    // Real Hedera on-chain TX
+    appendLog(jobId, 'Hedera: Sending real on-chain completion transaction...');
+    const realTx = await realHedera.sendCompletionPayment(jobId, job.title);
+    const realTxData = realTx.success
+      ? { realTxId: realTx.transactionId, realTxStatus: realTx.status, realTxNetwork: realTx.network, realTxUrl: realTx.explorerUrl, realTxSentAt: realTx.sentAt }
+      : { realTxId: null, realTxStatus: 'SIMULATION_MODE', realTxError: realTx.error };
+
+    if (realTx.success) {
+      appendLog(jobId, `✅ Real Hedera TX: ${realTx.transactionId} | ${realTx.status}`);
+      appendLog(jobId, `🔗 HashScan: ${realTx.explorerUrl}`);
+    }
+
+    // Pricing log
+    const actualDurationSeconds = Math.round((Date.now() - startTime) / 1000);
+    const pricingLog = pricingAgent.recordJobComplete(providers[0].id, actualDurationSeconds);
+    updateJob(jobId, { actualDurationSeconds, pricingLog });
+
+    updateJob(jobId, {
+      status: JOB_STATUS.COMPLETED,
+      progress: 100,
+      completedAt: new Date().toISOString(),
+      output: masterOutput,
+      distributedProviders: providers.slice(0, actualN).map(p => p.name),
+      ...realTxData,
+    });
+
+    appendLog(jobId, `Validator Agent: All sub-task outputs verified. Distributed job complete.`);
+    appendLog(jobId, `Validator Agent: ${actualN} providers rewarded. Escrow settlements finalised on Hedera.`);
+    appendLog(jobId, `Pricing Agent: Job recorded. Provider status: ${pricingLog.status}.`);
+
+  } catch (err) {
+    updateJob(jobId, { status: JOB_STATUS.FAILED });
+    appendLog(jobId, `Orchestrator Agent: ❌ Distributed execution failed — ${err.message}`);
+  }
+}
+
+// ── Standard Single-Provider Job ──────────────────────────────────────────────
+
 export async function runJob(jobId, job) {
+  // Route to heavy orchestration if job is complex
+  const complexity = analyseJobComplexity(job);
+  if (complexity.isHeavy) {
+    return runHeavyJob(jobId, job, complexity);
+  }
+
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   let selectedProviderId = null;
 
@@ -234,6 +483,8 @@ export async function runJob(jobId, job) {
     appendLog(jobId, `Error: ${err.message}`);
   }
 }
+
+// ── Simulate Failure ──────────────────────────────────────────────────────────
 
 export async function simulateFailure(jobId) {
   const job = getJob(jobId);

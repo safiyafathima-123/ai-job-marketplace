@@ -9,6 +9,7 @@ export const JOB_STATUS = {
   PENDING: 'pending',
   MATCHING: 'matching',
   RUNNING: 'running',
+  DISTRIBUTED: 'distributed', // parallel multi-provider execution
   COMPLETED: 'completed',
   FAILED: 'failed',
 };
@@ -21,6 +22,8 @@ export function createJob(data) {
     status: JOB_STATUS.PENDING,
     progress: 0,
     logs: [],
+    subTasks: [],       // populated by Orchestrator Agent for heavy jobs
+    isDistributed: false,
     createdAt: new Date().toISOString(),
   };
   jobs.set(id, job);

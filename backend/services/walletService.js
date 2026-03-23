@@ -3,7 +3,7 @@ const EXCHANGE_RATE = 1000; // 1 USD = 1000 COMPUTE tokens
 let wallet = {
   connected: false,
   accountId: null,
-  privateKeyMasked: null,
+  providerName: null,
   balanceTokens: 5000,
   allocatedTokens: 0,
   totalSpentTokens: 0,
@@ -12,22 +12,18 @@ let wallet = {
   transactionHistory: []
 };
 
-export function connectWallet(accountId, privateKey) {
-  if (!accountId || !privateKey) {
-    return { success: false, error: 'Account ID and Private Key are required.' };
+export function connectWallet(accountId, providerName) {
+  if (!accountId) {
+    return { success: false, error: 'Account ID is required.' };
   }
 
   if (!/^0\.0\.\d+$/.test(accountId)) {
     return { success: false, error: 'Invalid Account ID format. Use 0.0.XXXXX' };
   }
 
-  if (privateKey.length < 10) {
-    return { success: false, error: 'Private Key too short.' };
-  }
-
   wallet.connected = true;
   wallet.accountId = accountId;
-  wallet.privateKeyMasked = '****' + privateKey.slice(-4);
+  wallet.providerName = providerName || 'Local Wallet';
   wallet.connectedAt = new Date().toISOString();
 
   const { ...safeWallet } = wallet;
@@ -37,7 +33,7 @@ export function connectWallet(accountId, privateKey) {
 export function disconnectWallet() {
   wallet.connected = false;
   wallet.accountId = null;
-  wallet.privateKeyMasked = null;
+  wallet.providerName = null;
   wallet.connectedAt = null;
   return { success: true };
 }

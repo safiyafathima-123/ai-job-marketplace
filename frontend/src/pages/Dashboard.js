@@ -37,8 +37,8 @@ function MiniClock() {
 }
 
 function StatusBadge({ status }) {
-  const map = { pending:'○ Pending', matching:'◈ Matching', running:'▶ Running', completed:'✓ Completed', failed:'✗ Failed' };
-  return <span className={`badge badge-${status}`}>{map[status] || status}</span>;
+  const map = { pending:'○ Pending', matching:'◈ Matching', running:'▶ Running', distributed:'⚡ Distributed', completed:'✓ Completed', failed:'✗ Failed' };
+  return <span className={`badge badge-${status === 'distributed' ? 'running' : status}`}>{map[status] || status}</span>;
 }
 
 function StarRating({ value }) {
@@ -192,23 +192,34 @@ function PoweredByHedera() {
 
 // ── Agent Pipeline ────────────────────────────────────────────────────────────
 function AgentPipeline({ job }) {
-  const agents = [
+  const baseAgents = [
     { label:'Buyer Agent',    desc:'Job Created',       activeFrom:0  },
     { label:'Selector Agent', desc:'Provider Selected', activeFrom:20 },
     { label:'Provider Agent', desc:'Executing Task',    activeFrom:30 },
     { label:'Validator Agent',desc:'Verifying Output',  activeFrom:90 },
   ];
+
+  // Insert Orchestrator step for distributed jobs
+  const agents = job.isDistributed ? [
+    { label:'Buyer Agent',       desc:'Job Created',          activeFrom:0  },
+    { label:'Selector Agent',    desc:'Provider Scored',      activeFrom:15 },
+    { label:'Orchestrator',      desc:'Sub-tasks Dispatched', activeFrom:20, color:'#f472b6' },
+    { label:'Provider Agents',   desc:'Parallel Execution',   activeFrom:30 },
+    { label:'Validator Agent',   desc:'Verifying Output',     activeFrom:90 },
+  ] : baseAgents;
+
   return (
     <div style={{ display:'flex', gap:0 }}>
       {agents.map((agent, i) => {
         const done   = job.progress >= agent.activeFrom && (job.progress > agent.activeFrom || job.status==='completed');
         const active = job.progress >= agent.activeFrom && job.progress < (agents[i+1]?.activeFrom || 101) && job.status !== 'failed';
         const failed = job.status === 'failed' && active;
-        const color  = failed ? 'var(--red)' : done ? 'var(--green)' : active ? 'var(--accent)' : 'var(--text-muted)';
+        const baseColor = agent.color || null;
+        const color  = failed ? 'var(--red)' : baseColor && (done || active) ? baseColor : done ? 'var(--green)' : active ? 'var(--accent)' : 'var(--text-muted)';
         return (
           <div key={agent.label} style={{ flex:1, position:'relative' }}>
             {i < agents.length-1 && (
-              <div style={{ position:'absolute', top:13, left:'50%', right:'-50%', height:2, background: done ? 'var(--green)' : 'var(--border)', zIndex:0, transition:'background 400ms' }} />
+              <div style={{ position:'absolute', top:13, left:'50%', right:'-50%', height:2, background: done ? (baseColor || 'var(--green)') : 'var(--border)', zIndex:0, transition:'background 400ms' }} />
             )}
             <div style={{ textAlign:'center', position:'relative', zIndex:1 }}>
               <div style={{ width:26, height:26, borderRadius:'50%', margin:'0 auto 6px', background:(done||active)?color:'var(--bg)', border:`2px solid ${color}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.68rem', fontWeight:700, color:(done||active)?'#000':color, transition:'all 400ms ease', boxShadow:active?`0 0 10px ${color}`:'none' }}>
@@ -226,7 +237,8 @@ function AgentPipeline({ job }) {
 
 // ── Provider Panel with reputation ────────────────────────────────────────────
 function ProviderPanel({ job }) {
-  if (!job.selectedProvider) return null;
+  // Hide for distributed jobs — they show DistributedProviderPanel instead
+  if (!job.selectedProvider || job.isDistributed) return null;
   const specs = job.providerSpecs || {};
   const resourceTypeLabel = {
     'gpu-training':    'GPU Training',
@@ -592,20 +604,103 @@ function OutputPanel({ job }) {
 function ActivityLog({ logs }) {
   if (!logs?.length) return null;
   const agentColor = line =>
-    line.includes('Buyer Agent')    ? 'var(--amber)'  :
-    line.includes('Selector Agent') ? 'var(--accent)' :
-    line.includes('Provider Agent') ? 'var(--green)'  :
-    line.includes('Validator Agent')? '#c084fc'       :
-    line.includes('Hedera')         ? 'var(--accent)' :
+    line.includes('Orchestrator Agent') ? '#f472b6'      :
+    line.includes('Buyer Agent')        ? 'var(--amber)'  :
+    line.includes('Selector Agent')     ? 'var(--accent)' :
+    line.includes('Provider Agent')     ? 'var(--green)'  :
+    line.includes('Validator Agent')    ? '#c084fc'       :
+    line.includes('Hedera')             ? 'var(--accent)' :
     line.includes('✅') || line.includes('🔗') ? 'var(--green)' : 'var(--text-secondary)';
   return (
     <div style={{ marginBottom:12 }}>
       <SectionLabel>Agent Activity Log</SectionLabel>
       <div style={{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--radius)', padding:'10px 12px', maxHeight:160, overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:'var(--border) transparent' }}>
-        {[...logs].reverse().map((line, i) => (
-          <div key={i} className="mono" style={{ fontSize:'0.68rem', color:agentColor(line), marginBottom:4, lineHeight:1.5 }}>{line}</div>
-        ))}
+        {[...logs].reverse().map((item, i) => {
+          const line = typeof item === 'string' ? item : item.message || JSON.stringify(item);
+          return (
+            <div key={i} className="mono" style={{ fontSize:'0.68rem', color:agentColor(line), marginBottom:4, lineHeight:1.5 }}>{line}</div>
+          );
+        })}
       </div>
+    </div>
+  );
+}
+
+// ── Distributed Provider Panel ─────────────────────────────────────────────────
+function DistributedProviderPanel({ job }) {
+  if (!job.isDistributed || !job.subTasks?.length) return null;
+  const statusColor = s => s === 'completed' ? 'var(--green)' : s === 'failed' ? 'var(--red)' : s === 'running' ? 'var(--accent)' : 'var(--amber)';
+  const statusIcon  = s => s === 'completed' ? '✓' : s === 'failed' ? '✗' : s === 'running' ? '▶' : '◈';
+
+  return (
+    <div style={{ background:'var(--bg)', border:'1px solid rgba(167,139,250,0.4)', borderRadius:'var(--radius)', padding:'14px 16px', marginBottom:12 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+        <SectionLabel>⚡ Distributed Execution — {job.subTasks.length} Parallel Sub-tasks</SectionLabel>
+        <span style={{ fontSize:'0.65rem', fontWeight:800, padding:'3px 10px', borderRadius:99, background:'rgba(167,139,250,0.15)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.3)' }}>
+          ORCHESTRATOR AGENT
+        </span>
+      </div>
+
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {job.subTasks.map((st, i) => {
+          const sc = statusColor(st.status);
+          const si = statusIcon(st.status);
+          return (
+            <div key={i} style={{
+              padding:'12px 14px', borderRadius:12,
+              background: st.status === 'completed' ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)',
+              border:`1px solid ${sc}44`, transition:'all 400ms ease'
+            }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:22, height:22, borderRadius:'50%', background:sc, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.62rem', fontWeight:800, color:'#000', flexShrink:0 }}>
+                    {si}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight:800, fontSize:'0.82rem', color:'#fff' }}>{st.label}</div>
+                    <div style={{ fontSize:'0.65rem', color:'var(--text-muted)', marginTop:1 }}>
+                      {st.providerName} <span style={{ color: st.providerTier === 'premium' ? '#f59e0b' : 'var(--text-muted)', fontWeight:700 }}>· {st.providerTier}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:'0.62rem', fontWeight:900, color:sc, letterSpacing:'0.06em' }}>
+                    {(st.status || 'PENDING').toUpperCase()}
+                  </div>
+                  {st.providerScore && (
+                    <div style={{ fontSize:'0.6rem', color:'var(--text-muted)' }}>Score: {st.providerScore}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sub-task progress bar */}
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                <span style={{ fontSize:'0.6rem', color:'var(--text-muted)' }}>Sub-task progress</span>
+                <span className="mono" style={{ fontSize:'0.6rem', color:sc }}>{st.progress || 0}%</span>
+              </div>
+              <div style={{ height:6, background:'var(--border)', borderRadius:99, overflow:'hidden' }}>
+                <div style={{ height:'100%', borderRadius:99, width:`${st.progress || 0}%`, background: st.status === 'completed' ? 'var(--green)' : st.status === 'failed' ? 'var(--red)' : 'linear-gradient(90deg,#a78bfa,#7c3aed)', transition:'width 500ms ease' }} />
+              </div>
+
+              {st.contractId && (
+                <div className="mono" style={{ marginTop:6, fontSize:'0.58rem', color:'var(--text-muted)' }}>
+                  Contract: {st.contractId}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Summary row */}
+      {job.distributedProviders && (
+        <div style={{ marginTop:12, paddingTop:10, borderTop:'1px solid rgba(255,255,255,0.05)', display:'flex', gap:8, flexWrap:'wrap' }}>
+          <span style={{ fontSize:'0.68rem', color:'var(--text-muted)' }}>Providers:</span>
+          {job.distributedProviders.map((name, i) => (
+            <span key={i} style={{ fontSize:'0.68rem', color:'var(--accent)', fontWeight:700 }}>{name}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -683,6 +778,7 @@ function JobCard({ job, isExpanded, onToggle, onSimulateFailure }) {
               <span style={{ fontWeight:700, fontSize:'0.95rem' }}>{job.title}</span>
               <StatusBadge status={job.status} />
               {isActive && <span style={{ fontSize:'0.65rem', color:'var(--accent)', fontWeight:700, animation:'pulse 1.2s infinite' }}>● LIVE</span>}
+              {job.isDistributed && <span style={{ fontSize:'0.65rem', color:'#f472b6', fontWeight:700, padding:'2px 8px', borderRadius:99, background:'rgba(244,114,182,0.12)', border:'1px solid rgba(244,114,182,0.3)' }}>⚡ DISTRIBUTED</span>}
             </div>
             <div style={{ display:'flex', gap:12, marginTop:5, flexWrap:'wrap' }}>
               <span className="mono" style={{ fontSize:'0.7rem', color:'var(--text-muted)' }}>{job.jobType}</span>
@@ -717,8 +813,11 @@ function JobCard({ job, isExpanded, onToggle, onSimulateFailure }) {
             <AgentPipeline job={job} />
           </div>
 
-          {/* Provider + Resource */}
+          {/* Provider + Resource (hidden for distributed jobs) */}
           <ProviderPanel job={job} />
+
+          {/* Distributed Execution Panel */}
+          <DistributedProviderPanel job={job} />
 
           {/* Pricing Intelligence */}
           <PricingIntelligence job={job} />
@@ -752,7 +851,7 @@ function JobCard({ job, isExpanded, onToggle, onSimulateFailure }) {
 function StatsStrip({ jobs }) {
   const total     = jobs.length;
   const completed = jobs.filter(j => j.status==='completed').length;
-  const active    = jobs.filter(j => ['pending','matching','running'].includes(j.status)).length;
+  const active    = jobs.filter(j => ['pending','matching','running','distributed'].includes(j.status)).length;
   const failed    = jobs.filter(j => j.status==='failed').length;
   const tokens    = jobs.reduce((s, j) => s + (j.hedera?.releasedTokens||0), 0);
   return (

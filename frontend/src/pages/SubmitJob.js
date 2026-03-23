@@ -419,6 +419,48 @@ export default function SubmitJob() {
                   </div>
                 </div>
 
+                {/* Heavy-job complexity badge */}
+                {(() => {
+                  const budget = parseFloat(form.budget) || 0;
+                  const cat = getCategoryForType(form.jobType);
+                  const isHeavyGpu = cat === 'gpu-training' && budget >= 0.05;
+                  const isHeavyAny = budget >= 0.10;
+                  if (!form.jobType || !form.budget || (!isHeavyGpu && !isHeavyAny)) return null;
+                  const numProviders = isHeavyAny ? 3 : 2;
+                  const reason = isHeavyGpu
+                    ? `Large GPU training workload — job will be split across ${numProviders} GPU clusters for parallelised epoch computation.`
+                    : `High-budget workload — distributing across ${numProviders} specialised providers for redundancy & speed.`;
+                  return (
+                    <div style={{
+                      padding: '16px 20px', borderRadius: 16,
+                      background: 'linear-gradient(135deg, rgba(167,139,250,0.12), rgba(124,58,237,0.08))',
+                      border: '1px solid rgba(167,139,250,0.45)',
+                      display: 'flex', gap: 14, alignItems: 'flex-start',
+                      animation: 'fadeInUp 0.3s ease-out forwards',
+                    }}>
+                      <span style={{ fontSize: '1.4rem', lineHeight: 1 }}>⚡</span>
+                      <div>
+                        <div style={{ fontWeight: 900, fontSize: '0.8rem', color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 4 }}>
+                          HEAVY JOB — AUTO-DISTRIBUTED ACROSS {numProviders} PROVIDERS
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#c4b5fd', lineHeight: 1.5 }}>
+                          {reason}
+                        </div>
+                        <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {Array.from({ length: numProviders }, (_, i) => (
+                            <span key={i} style={{ fontSize: '0.68rem', padding: '3px 10px', borderRadius: 99, background: 'rgba(167,139,250,0.15)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.3)', fontWeight: 700 }}>
+                              Sub-task {i + 1}
+                            </span>
+                          ))}
+                          <span style={{ fontSize: '0.68rem', padding: '3px 10px', borderRadius: 99, background: 'rgba(16,185,129,0.1)', color: 'var(--green)', border: '1px solid rgba(16,185,129,0.3)', fontWeight: 700 }}>
+                            ✓ Parallel Execution
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <button 
                   type="submit" 
                   disabled={loading || !form.title || !form.budget}

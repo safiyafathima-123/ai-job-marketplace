@@ -24,14 +24,26 @@ function ModalStyles() {
 
 // ── Wallet Modal Component ────────────────────────────────────────────────────
 function WalletModal({ onClose, onConnected }) {
+  const [step, setStep] = useState(1);
+  const [selectedProvider, setSelectedProvider] = useState(null);
   const [accountId, setAccountId] = useState('');
-  const [privateKey, setPrivateKey] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const providers = [
+    { id: 'HashPack', name: 'HashPack', icon: '🐺', desc: 'Leading Hedera Native Wallet' },
+    { id: 'Blade', name: 'Blade Wallet', icon: '⚔️', desc: 'Secure Enterprise Wallet' },
+    { id: 'MetaMask', name: 'MetaMask', icon: '🦊', desc: 'Hedera Web3 RPC Connector' },
+  ];
+
+  const handleSelectProvider = (provider) => {
+    setSelectedProvider(provider.id);
+    setStep(2);
+  };
+
   const handleConnect = async () => {
-    if (!accountId || !privateKey) {
-      setError('Account ID and Private Key are required.');
+    if (!accountId) {
+      setError('Account ID is required.');
       return;
     }
     setError('');
@@ -41,7 +53,7 @@ function WalletModal({ onClose, onConnected }) {
       const res = await fetch('/api/wallet/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId, privateKey })
+        body: JSON.stringify({ accountId, providerName: selectedProvider })
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -62,39 +74,72 @@ function WalletModal({ onClose, onConnected }) {
       <ModalStyles />
       <div className="card modal-card-animate" style={{ 
         background: 'var(--bg-card)', border: '1px solid var(--border-bright)', borderRadius: 'var(--radius-lg)', 
-        padding: '40px', width: '420px', maxWidth: '100%', position: 'relative', 
+        padding: '36px', width: '420px', maxWidth: '100%', position: 'relative', 
         boxShadow: '0 40px 100px rgba(0,0,0,0.8), 0 0 50px rgba(0, 229, 255, 0.15)',
         margin: 'auto'
       }}>
-        <div style={{ fontWeight: 900, fontSize: '1.3rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>💳 Connect Your Wallet</div>
-        <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '28px', lineHeight: 1.5 }}>Enter your Hedera Testnet details to fund jobs with COMPUTE tokens.</div>
-        
-        <div className="form-group" style={{ marginBottom: '20px' }}>
-          <label className="form-label" style={{ fontSize: '0.7rem', opacity: 0.8 }}>Account ID</label>
-          <input className="form-input" placeholder="0.0.XXXXXX" value={accountId} onChange={e => setAccountId(e.target.value)} style={{ padding: '14px', fontSize: '1rem' }} />
-        </div>
-        
-        <div className="form-group" style={{ marginBottom: '24px' }}>
-          <label className="form-label" style={{ fontSize: '0.7rem', opacity: 0.8 }}>Private Key</label>
-          <input className="form-input" type="password" placeholder="Your Hedera private key…" value={privateKey} onChange={e => setPrivateKey(e.target.value)} style={{ padding: '14px', fontSize: '1rem' }} />
-        </div>
-
-        {error && (
-          <div style={{ padding: '14px', background: 'rgba(255, 69, 96, 0.12)', border: '1px solid var(--red)', borderRadius: '12px', color: 'var(--red)', fontSize: '0.82rem', marginBottom: '20px', fontWeight: 600 }}>
-            ⚠️ {error}
-          </div>
+        {step === 1 && (
+          <>
+            <div style={{ fontWeight: 900, fontSize: '1.3rem', marginBottom: '8px', letterSpacing: '-0.02em', textAlign: 'center' }}>Connect a Wallet</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginBottom: '24px', lineHeight: 1.5, textAlign: 'center' }}>
+              Select your preferred Web3 provider to interact with the Hedera network.
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              {providers.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => handleSelectProvider(p)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '16px', width: '100%', padding: '16px 20px',
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', textAlign: 'left'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
+                >
+                  <span style={{ fontSize: '1.8rem' }}>{p.icon}</span>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff', marginBottom: '2px' }}>{p.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.desc}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button className="btn btn-ghost" style={{ width: '100%' }} onClick={onClose}>Cancel</button>
+          </>
         )}
 
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-          <button className="btn btn-primary" style={{ flex: 1, padding: '16px', fontWeight: 900, fontSize: '0.95rem' }} onClick={handleConnect} disabled={loading}>
-            {loading ? 'Processing...' : '🔗 Connect Wallet'}
-          </button>
-          <button className="btn btn-ghost" onClick={onClose} disabled={loading} style={{ padding: '0 24px' }}>Cancel</button>
-        </div>
+        {step === 2 && (
+          <>
+            <button onClick={() => { setStep(1); setError(''); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.9rem', cursor: 'pointer', padding: 0, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              ← <span style={{ textDecoration: 'underline' }}>Back</span>
+            </button>
+            <div style={{ fontWeight: 900, fontSize: '1.25rem', marginBottom: '8px', letterSpacing: '-0.02em' }}>Link {selectedProvider}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '28px', lineHeight: 1.5 }}>
+              Enter your Hedera Testnet Account ID. (Simulation Mode: No private key required).
+            </div>
+            
+            <div className="form-group" style={{ marginBottom: '24px' }}>
+              <label className="form-label" style={{ fontSize: '0.75rem', opacity: 0.8 }}>Account ID</label>
+              <input className="form-input" placeholder="0.0.XXXXXX" value={accountId} onChange={e => setAccountId(e.target.value)} style={{ padding: '14px', fontSize: '1.1rem', fontFamily: 'var(--font-mono)' }} autoFocus />
+            </div>
 
-        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', opacity: 0.6 }}>
-          💡 Starting balance: 5,000 COMPUTE • 1 USD = 1,000 COMPUTE<br/>Keys are processed locally and never stored.
-        </div>
+            {error && (
+              <div style={{ padding: '14px', background: 'rgba(255, 69, 96, 0.12)', border: '1px solid var(--red)', borderRadius: '12px', color: 'var(--red)', fontSize: '0.82rem', marginBottom: '20px', fontWeight: 600 }}>
+                ⚠️ {error}
+              </div>
+            )}
+
+            <button className="btn btn-primary" style={{ width: '100%', padding: '16px', fontWeight: 900, fontSize: '0.95rem', marginBottom: '16px' }} onClick={handleConnect} disabled={loading || !accountId}>
+              {loading ? 'Connecting...' : '🔗 Authorize Header Connection'}
+            </button>
+
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', opacity: 0.6 }}>
+              💡 Starting mock balance: 5,000 COMPUTE.
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -164,7 +209,7 @@ function Nav() {
                   {wallet.balanceTokens - wallet.allocatedTokens} COMPUTE
                 </div>
                 <div style={{ fontSize: '0.62rem', color: 'var(--text-secondary)', fontWeight: 600, opacity: 0.8 }}>
-                  {wallet.accountId}
+                  {wallet.providerName} • {wallet.accountId}
                 </div>
               </div>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', boxShadow: '0 0 10px var(--green)', animation: 'pulse 2s infinite' }} />
