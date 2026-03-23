@@ -59,6 +59,7 @@ const Providers = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -73,8 +74,10 @@ const Providers = () => {
       const [pData, sData] = await Promise.all([fetchProviders(), fetchMarketSummary()]);
       setProviders(pData.providers || []);
       setSummary(sData);
+      setError(null);
     } catch (err) {
       console.error('Failed to load provider data:', err);
+      setError('Failed to connect to the node network. Please ensure the backend server is running.');
     } finally {
       setLoading(false);
     }
@@ -229,7 +232,16 @@ const Providers = () => {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '32px' }}>
-          {providers.map(p => {
+          {error ? (
+            <div style={{ gridColumn: '1 / -1', padding: '40px', background: 'rgba(255, 69, 96, 0.05)', border: '1px solid var(--red-dim)', borderRadius: '16px', color: 'var(--red)', textAlign: 'center', fontSize: '1.1rem', fontWeight: 600 }}>
+              ⚠️ {error}
+            </div>
+          ) : providers.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', padding: '60px', background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.1)', borderRadius: '16px', color: 'var(--text-muted)', textAlign: 'center', fontSize: '1.1rem' }}>
+              No providers currently found on the network. Register one above to test!
+            </div>
+          ) : (
+            providers.map(p => {
             const earnings = (p.jobsCompleted * (p.costPerTask || 0)).toFixed(2);
             const stars = Math.round((p.reputation || 0) / 2);
             
@@ -292,7 +304,7 @@ const Providers = () => {
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
       </section>
 

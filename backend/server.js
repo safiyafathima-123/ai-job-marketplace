@@ -12,7 +12,9 @@ const DEFAULT_PORT = Number(process.env.PORT) || 5000;
 const MAX_PORT_RETRIES = 10;
 
 // -- Middleware --
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({
+  origin: [/^http:\/\/localhost(:\d+)?$/, 'https://ai-job-marketplace.vercel.app']
+}));
 app.use(express.json());
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
